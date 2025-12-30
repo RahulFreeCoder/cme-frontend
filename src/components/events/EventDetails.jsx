@@ -12,7 +12,8 @@ import {
   Mail, 
   Phone, 
   Globe,
-  Info
+  Info,
+   CheckCircle2,
 } from "lucide-react";
 
 import SectionCard from "../ui/SectionCard";
@@ -46,8 +47,8 @@ export default function EventDetail({ event, onBack, onRegister, isRegistered })
   const feeInfo = getFinalFeeInfo(event.registrationFees, "doctor");
 
   const featuredSpeakers = useMemo(
-    () => getUniqueKeySpeakersFromSchedule(event.speakers),
-    [event.speakers]
+    () => getUniqueKeySpeakersFromSchedule(event.schedule),
+    [event.sxhedule]
   );
 
   return (
@@ -116,7 +117,9 @@ export default function EventDetail({ event, onBack, onRegister, isRegistered })
                             )}
                           </div>
                           <div className="text-right">
-                            <span className="text-blue-600 font-black text-base">
+                            <span className={`font-black text-base ${
+                                finalPrice === 0 ? "text-emerald-600" : "text-blue-600"
+                              }`}>
                               {finalPrice === 0 ? "Free" : `₹ ${finalPrice.toLocaleString()}`}
                             </span>
                             {fee.discountPercent > 0 && (
@@ -130,8 +133,16 @@ export default function EventDetail({ event, onBack, onRegister, isRegistered })
                     })}
                   </ul>
                   ): (
-                    <div className="py-2 text-slate-400 italic text-xs">
-                      No Fees
+                    <div className="mb-8 p-6 bg-emerald-50/50 border border-dashed border-emerald-200 rounded-2xl text-center group-hover:bg-emerald-50 transition-colors">
+                      <div className="w-10 h-10 bg-white text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                        <CheckCircle2 size={20} />
+                      </div>
+                      <p className="text-emerald-700 font-black text-[11px] uppercase tracking-[0.15em]">
+                        Free Entry
+                      </p>
+                      <p className="text-[10px] text-emerald-600/70 font-bold uppercase mt-1">
+                        Complimentary Registration
+                      </p>
                     </div>
                   )} 
                   <button

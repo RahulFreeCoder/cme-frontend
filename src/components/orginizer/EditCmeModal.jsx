@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 
 export default function EditCmeModal({ cme, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+    <div className="fixed inset-0 z-160 bg-black/40 flex items-center justify-center">
       
       {/* Modal Container */}
       <div className="relative bg-white w-full max-w-5xl h-[99vh] rounded-xl shadow-lg flex flex-col">
@@ -26,7 +26,14 @@ export default function EditCmeModal({ cme, onClose }) {
             mode="edit"
             initialData={cme}
           />
+            <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 transition"
+          >
+            <X size={18} />
+          </button>
         </div>
+                
 
       </div>
     </div>

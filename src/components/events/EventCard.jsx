@@ -13,8 +13,10 @@ import sample from '../../assets/sample.jpg';
 function EventCard({ event, onRegister, onViewEventDetails }) {
   const feeInfo = getFinalFeeInfo(event.registrationFees, "doctor");
   const featuredSpeakers = useMemo(
-    () => getUniqueKeySpeakersFromSchedule(event.speakers),
-    [event.speakers]);
+    () => getUniqueKeySpeakersFromSchedule(event.schedule),
+    [event.schedule]);
+
+  console.log('Featured Speaker:', featuredSpeakers);
 
   const { spotsLeft, isAlmostFull, isFull, isLimitedSeats } = useMemo(
     () => getSeatStatus(event.totalSeats, event.registeredSeats),
@@ -82,15 +84,21 @@ function EventCard({ event, onRegister, onViewEventDetails }) {
           }   
       </div>
           {/*Event Card body */}
-      <div className="p-6">
-        <h3 className="text-gray-900 mb-2 text-xl">{event.title}</h3>
-        <p className="text-gray-600 mb-4 line-clamp-2">{event.description}</p>
+      <div className="p-6 h-[300  px]">
+        <div className="overflow-hidden">
+          <h2 className="text-slate-800 mb-2 text-l font-black leading-tight line-clamp-2">
+            {event.title.toUpperCase()}
+          </h2>
+          <p className="text-slate-600 mb-2  text-sm line-clamp-3 leading-relaxed h-[56px]">
+            {event.description}
+          </p>
+        </div>
 
         {/* Event Details */}
         <div className="space-y-2 mb-4">
          <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm text-gray-600">
             <Meta icon={Calendar} text={dateFormatter(event.startDate)} />
-            <Meta icon={Clock} text={formatTimeRange(event.startTime, event.endTime)} />
+            <Meta icon={Clock} text={formatTimeRange(event?.startTime, event?.endTime)} />
           </div>
           <div className="grid grid-cols-1 text-sm text-gray-600">
               <Meta icon={MapPin} text={formatAddress(event.location)} />
@@ -102,7 +110,7 @@ function EventCard({ event, onRegister, onViewEventDetails }) {
             size="md"
           />
             <div>
-              <p className="font-medium">{featuredSpeakers[0].name}</p>
+              <p className="font-medium">{featuredSpeakers[0]?.name}</p>
               <p className="text-xs text-gray-500">Key Speaker</p>
             </div>
         </div>

@@ -103,10 +103,14 @@ export default function Home() {
 
       // 3. Free Events Count
       // We check if at least one fee tier has a price of 0
-      const isFree = event?.registrationFees && 
-                     Array.isArray(event.registrationFees) && 
-                     event.registrationFees.some(fee => Number(fee?.price) === 0);
-      if (isFree) result.freeEventsCount++;
+      const isFree = !event?.registrationFees || 
+               !Array.isArray(event.registrationFees) || 
+               event.registrationFees.length === 0 || 
+               event.registrationFees.some(fee => Number(fee?.price) === 0);
+
+      if (isFree) {
+        result.freeEventsCount++;
+      }
 
       // 4. Unique Key Speakers
       if (event?.speakers && Array.isArray(event.speakers)) {

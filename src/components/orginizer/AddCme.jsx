@@ -19,7 +19,7 @@ import {
 /* ---------- Constants ---------- */
 const STEPS = [
   "Basic Info", "Date & Location", "Capacity & Credits", "Fees", 
-  "Schedule", "Speakers", "Organizer & Contact", "Payment", 
+  "Schedule", "Organizer & Contact", "Payment", 
   "Additional Info", "Review"
 ];
 
@@ -90,7 +90,10 @@ export default function AddCme({ mode = "add", initialData = null }) {
     startDate: "", endDate: "", startTime: "", endTime: "",
     location: { address: "", city: "", state: "", country: "", zipCode: "" },
     registrationFees: [], credits: 0, totalSeats: 0, isActive: true,
-    schedule: [], speakers: [],
+    schedule: [
+      { date: "", time: "", topics: "", speaker: [] 
+    }
+    ], 
     organizer: { organization: "", email: userEmail, phone: "", website: "", committee: "" },
     contact: { name: "", phoneNumber: "", email: "" },
     paymentDetails: { accountNumber: "", accountName: "", ifscCode: "", upiCode: "", date: new Date().toISOString() },
@@ -140,16 +143,20 @@ export default function AddCme({ mode = "add", initialData = null }) {
       break;
       case 4:
         if (formData.schedule.length === 0) errs.schedule = "Add at least one entry";
-        formData.schedule.forEach((f, i) => {
-          if (!required(f.date)) errs[`schedule.${i}.date`] = "Date required";
-          if (!required(f.time)) errs[`schedule.${i}.time`] = "Time required";
-          if (!required(f.topics)) errs[`schedule.${i}.topics`] = "Topic required";
+        formData.schedule.forEach((s, i) => {
+          if (!required(s.date)) errs[`schedule.${i}.date`] = "Date required";
+          if (!required(s.time)) errs[`schedule.${i}.time`] = "Time required";
+          if (!required(s.topics)) errs[`schedule.${i}.topics`] = "Topic required";
+          
+          // Validate speakers within the schedule
+          if (s.speaker && s.speaker.length > 0) {
+            s.speaker.forEach((sp, si) => {
+              if (!required(sp.name)) errs[`schedule.${i}.speaker.${si}.name`] = "Speaker name required";
+            });
+          }
         });
         break;
       case 5:
-        if (formData.speakers.length === 0) errs.speakers = "At least one speaker required";
-        break;
-      case 6:
         // Validate only specific required fields in organizer
         if (!required(formData.organizer.organization)) errs["organizer.organization"] = "Organization name is required";
         if (!required(formData.organizer.phone)) errs["organizer.phone"] = "Phone number is required";
@@ -159,7 +166,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
           if (!required(v)) errs[`contact.${k}`] = "Required"; 
         });
         break;
-      case 7:
+      case 6:
         // Check if any fee category has a price greater than 0
         const isPaidEvent = formData.registrationFees.some(fee => fee.price > 0);
 
@@ -173,7 +180,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
         }
         // If isPaidEvent is false (Free CME), the loop is skipped and no errors are added
         break;
-      case 8:
+      case 7:
         //if (formData.additionalInformation.length === 0) errs.additionalInformation = "Required";
         break;
       default: break;
@@ -206,7 +213,14 @@ export default function AddCme({ mode = "add", initialData = null }) {
       const apiMethod = mode === "edit" ? "put" : "post";
       console.log("cmeid", formData.cmeId);
       const apiUrl = mode === "edit" ? `/api/CME/admin/cme/${formData.cmeId}/update` : "/api/CME/admin/cme/add";
-      await axiosInstance[apiMethod](apiUrl, formData);
+      const payload = { ...formData };
+
+      // UX/Technical Logic: Remove cmeId for 'add' mode to let backend generate it
+      if (mode === "add") {
+        delete payload.cmeId;
+      }
+
+      await axiosInstance[apiMethod](apiUrl, payload);
       toast.success(mode === "edit" ? "CME updated" : "CME created");
       navigate("/organizer");
     } catch (err) {
@@ -264,10 +278,35 @@ export default function AddCme({ mode = "add", initialData = null }) {
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <SectionHeader icon={Info} title="Basic Information" desc="Configure identity and specialities" />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <CleanInput label="CME ID" value={formData.cmeId} onChange={(v) => update("cmeId", v)} disabled={mode === "edit"} error={errors.cmeId} />
-                    <div className="md:col-span-2">
-                      <CleanInput label="Event Title" value={formData.title} onChange={(v) => update("title", v)} error={errors.title} />
-                    </div>
+                    {mode === "edit" ? (
+                      <>
+                        <CleanInput 
+                          label="CME ID" 
+                          value={formData.cmeId} 
+                          onChange={(v) => update("cmeId", v)} 
+                          disabled={true} 
+                          error={errors.cmeId} 
+                        />
+                        <div className="md:col-span-2">
+                          <CleanInput 
+                            label="Event Title" 
+                            value={formData.title} 
+                            onChange={(v) => update("title", v)} 
+                            error={errors.title} 
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      /* Full width title for Add mode */
+                      <div className="md:col-span-3">
+                        <CleanInput 
+                          label="Event Title" 
+                          value={formData.title} 
+                          onChange={(v) => update("title", v)} 
+                          error={errors.title} 
+                        />
+                      </div>
+                    )}
                   </div>
                   <CleanInput label="Public Description" textarea value={formData.description} onChange={(v) => update("description", v)} error={errors.description} />
                   <div className="mt-8 space-y-8">
@@ -354,56 +393,122 @@ export default function AddCme({ mode = "add", initialData = null }) {
 
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <SectionHeader icon={ListChecks} title="Scientific Schedule" desc="Timeline of events/sessions" />
+                  <SectionHeader icon={ListChecks} title="Scientific Schedule" desc="Timeline and Faculty Assignment" />
                   <div className="space-y-6">
                     {formData.schedule.map((s, i) => (
-                      <div key={i} className="p-6 bg-slate-50 border border-slate-200 rounded-2xl relative">
-                        <button onClick={() => update("schedule", formData.schedule.filter((_, ix) => ix !== i))} className="absolute top-4 right-4 text-slate-300 hover:text-red-500">
-                          <Trash2 size={16}/>
+                      <div key={i} className="p-8 bg-slate-50 border border-slate-200 rounded-[2rem] relative">
+                        <button 
+                          onClick={() => update("schedule", formData.schedule.filter((_, ix) => ix !== i))} 
+                          className="absolute top-6 right-6 text-slate-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={18}/>
                         </button>
-                        <div className="grid grid-cols-2 gap-6 mb-4">
+
+                        <div className="grid grid-cols-2 gap-6 mb-6">
                           <CleanInput type="date" label="Session Date" value={s.date} onChange={(v) => { const arr = [...formData.schedule]; arr[i].date = v; update("schedule", arr); }} error={errors[`schedule.${i}.date`]} />
-                          <TimePicker label="Start Time" value={s.time} onChange={(v) => { const arr = [...formData.schedule]; arr[i].time = v; update("schedule", arr); }} error={errors[`schedule.${i}.time`]} />
+                          <TimePicker label="Time Slot" value={s.time} onChange={(v) => { const arr = [...formData.schedule]; arr[i].time = v; update("schedule", arr); }} error={errors[`schedule.${i}.time`]} />
                         </div>
-                        <CleanInput label="Topics & Details" textarea value={s.topics} onChange={(v) => { const arr = [...formData.schedule]; arr[i].topics = v; update("schedule", arr); }} error={errors[`schedule.${i}.topics`]} />
+                        
+                        <CleanInput label="Session Topic" textarea value={s.topics} onChange={(v) => { const arr = [...formData.schedule]; arr[i].topics = v; update("schedule", arr); }} error={errors[`schedule.${i}.topics`]} />
+
+                        {/* NESTED SPEAKERS FOR THIS SESSION */}
+                        <div className="mt-8 pt-6 border-t border-slate-200/60">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Assigned Faculty</h4>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const arr = [...formData.schedule];
+                                arr[i].speaker = [...(arr[i].speaker || []), { name: "", speciality: "", designation: "", isKeySpeaker: false }];
+                                update("schedule", arr);
+                              }}
+                              className="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase flex items-center gap-1 transition-colors"
+                            >
+                              <Plus size={12} /> Add Speaker
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            {s.speaker?.map((sp, si) => (
+                              <div key={si} className="p-6 bg-white border border-slate-100 rounded-2xl shadow-sm relative group animate-in fade-in slide-in-from-left-2">
+                                {/* Speaker Header & Remove Button */}
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Speaker #{si + 1}</span>
+                                  </div>
+                                  <button 
+                                    onClick={() => {
+                                      const arr = [...formData.schedule];
+                                      arr[i].speaker = arr[i].speaker.filter((_, six) => six !== si);
+                                      update("schedule", arr);
+                                    }}
+                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Row 1: Name and Speciality */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                  <CleanInput label="Speaker Name" value={sp.name} onChange={(v) => {
+                                    const arr = [...formData.schedule];
+                                    arr[i].speaker[si].name = v;
+                                    update("schedule", arr);
+                                  }} />
+                                  <CleanInput label="Speciality" value={sp.speciality} onChange={(v) => {
+                                    const arr = [...formData.schedule];
+                                    arr[i].speaker[si].speciality = v;
+                                    update("schedule", arr);
+                                  }} />
+                                </div>
+
+                                {/* Row 2: Designation */}
+                                <div className="mb-4">
+                                  <CleanInput label="Designation" value={sp.designation} onChange={(v) => {
+                                    const arr = [...formData.schedule];
+                                    arr[i].speaker[si].designation = v;
+                                    update("schedule", arr);
+                                  }} />
+                                </div>
+
+                                {/* Row 3: Biography/Details */}
+                                <div className="mb-4">
+                                  <CleanInput label="Speaker Biography" textarea value={sp.details} onChange={(v) => {
+                                    const arr = [...formData.schedule];
+                                    arr[i].speaker[si].details = v;
+                                    update("schedule", arr);
+                                  }} />
+                                </div>
+
+                                {/* Row 4: Key Speaker Toggle */}
+                                <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors border border-transparent hover:border-indigo-100">
+                                  <input 
+                                    type="checkbox" 
+                                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" 
+                                    checked={sp.isKeySpeaker} 
+                                    onChange={(e) => {
+                                      const arr = [...formData.schedule];
+                                      arr[i].speaker[si].isKeySpeaker = e.target.checked;
+                                      update("schedule", arr);
+                                    }} 
+                                  />
+                                  <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Mark as Key Speaker</span>
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ))}
-                    <button type="button" onClick={() => update("schedule", [...formData.schedule, { date: "", time: "", topics: "" }])} className="w-full py-4 bg-white border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 flex items-center justify-center gap-2">
-                      <Plus size={16}/> Add Entry
+                    <button type="button" onClick={() => update("schedule", [...formData.schedule, { date: "", time: "", topics: "", speaker: [] }])} className="w-full py-4 border border-dashed border-slate-300 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 flex items-center justify-center gap-2">
+                      <Plus size={16}/> Add New Session
                     </button>
                   </div>
                 </div>
               )}
 
               {step === 5 && (
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <SectionHeader icon={Mic2} title="Keynote Speakers" desc="Manage faculty and experts" />
-                  <div className="space-y-8">
-                    {formData.speakers.map((sp, i) => (
-                      <div key={i} className="p-8 bg-white border border-slate-200 rounded-[2rem] relative shadow-sm hover:border-indigo-100 transition-all">
-                        <button onClick={() => update("speakers", formData.speakers.filter((_, ix) => ix !== i))} className="absolute top-6 right-6 text-slate-300 hover:text-red-500"><Trash2 size={18}/></button>
-                        <div className="grid grid-cols-2 gap-6 mb-6">
-                          <CleanInput label="Full Name" value={sp.name} onChange={(v) => { const arr = [...formData.speakers]; arr[i].name = v; update("speakers", arr); }} error={errors[`speakers.${i}.name`]} />
-                          <CleanInput label="Speciality" value={sp.speciality} onChange={(v) => { const arr = [...formData.speakers]; arr[i].speciality = v; update("speakers", arr); }} />
-                        </div>
-                        <CleanInput label="Designation" value={sp.designation} onChange={(v) => { const arr = [...formData.speakers]; arr[i].designation = v; update("speakers", arr); }} />
-                        <div className="mt-6">
-                           <CleanInput label="Faculty Biography" textarea value={sp.details} onChange={(v) => { const arr = [...formData.speakers]; arr[i].details = v; update("speakers", arr); }} />
-                        </div>
-                        <label className="flex items-center gap-3 mt-6 p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-indigo-50 transition-colors">
-                          <input type="checkbox" className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500" checked={sp.isKeySpeaker} onChange={(e) => { const arr = [...formData.speakers]; arr[i].isKeySpeaker = e.target.checked; update("speakers", arr); }} />
-                          <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Assign as Key Speaker</span>
-                        </label>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => update("speakers", [...formData.speakers, { name: "", speciality: "", designation: "", isKeySpeaker: false, details: "", profileImage: "" }])} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 flex items-center justify-center gap-2">
-                      <Plus size={16}/> Add Speaker Profile
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 6 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <SectionHeader icon={Briefcase} title="Host Organization" desc="Corporate and organizer details" />
                   <div className="space-y-8">
@@ -432,7 +537,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
                 </div>
               )}
 
-              {step === 7 && (
+              {step === 6 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   {/* Logic check: Is there at least one paid category? */}
                   {formData.registrationFees.some(fee => fee.price > 0) ? (
@@ -492,13 +597,17 @@ export default function AddCme({ mode = "add", initialData = null }) {
                 </div>
               )}
 
-              {step === 8 && (
+              {step === 7 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <SectionHeader icon={ListChecks} title="Additional Notes" desc="Misc instructions or registration details" />
                   <CleanInput label="Information Snippets (Comma-separated)" textarea 
                     placeholder="Lunch provided, Free parking, Carry ID card..."
                     value={formData.additionalInformation.join(", ")}
-                    onChange={(v) => update("additionalInformation", v.split(",").map(s => s.trim()))}
+                    onChange={(v) => {
+                        // Split by comma, but DON'T trim the individual strings yet
+                        const tags = v.split(","); 
+                        update("additionalInformation", tags);
+                      }}
                     error={errors.additionalInformation}
                   />
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -509,7 +618,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
                 </div>
               )}
 
-              {step === 9 && (
+              {step === 8 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-10">
                   <SectionHeader icon={CheckCircle2} title="Final Validation" desc="Review all data before publishing" />
                   

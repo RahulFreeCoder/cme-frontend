@@ -1,16 +1,112 @@
-# React + Vite
+# cme-frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+CME frontend app for event management — a React + Vite application scaffolded with Tailwind CSS and Redux Toolkit. This repository contains the client-side code for the CME event management UI.
 
-Currently, two official plugins are available:
+## Quick overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Framework: React (v19)
+- Bundler / dev server: Vite
+- Styling: Tailwind CSS
+- State management: Redux Toolkit
+- Other notable libraries: ag-grid, react-router-dom, axios, lucide-react, swiper, react-hot-toast
 
-## React Compiler
+## Requirements
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 18+ (recommended)
+- npm (or yarn/pnpm)
 
-## Expanding the ESLint configuration
+## Getting started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Install dependencies
+   npm install
+
+2. Start development server
+   npm run dev
+   - Opens Vite dev server with HMR on the default port (usually 5173).
+
+3. Build for production
+   npm run build
+
+4. Preview production build locally
+   npm run preview
+
+5. Run ESLint
+   npm run lint
+
+## Available npm scripts
+
+- dev: Start Vite dev server
+- build: Build production assets with Vite
+- preview: Preview production build locally
+- lint: Run ESLint across the project
+
+(These are defined in package.json.)
+
+## Project structure (important files & folders)
+
+- index.html — App entry HTML
+- package.json — Scripts and dependencies
+- vite.config.js — Vite configuration
+- postcss.config.js, tailwind.config.js — Tailwind/PostCSS setup
+- src/
+  - main.jsx — App bootstrap
+  - App.jsx — Root app component and router
+  - index.css — Global styles (Tailwind entry)
+  - assets/ — static assets (images, icons, etc.)
+  - components/ — reusable UI components
+  - pages/ — route-level page components
+  - redux/ — redux slices / store setup
+  - services/ — API / data access utilities
+  - styles/ — additional shared styles
+- public/ — static files served as-is
+- .gitignore
+- netlify.toml — Netlify configuration (if deploying to Netlify)
+- eslint.config.js — ESLint configuration
+
+Note: Some directories are present as placeholders ready to be filled with components, pages, redux slices, and services.
+
+## Configuration & environment
+
+- There is no repository-level .env example included. If your app needs environment variables (API base URL, keys, etc.), add a `.env` or `.env.local` file and ensure it's listed in `.gitignore` as appropriate.
+- Tailwind is configured via `tailwind.config.js` and `postcss.config.js`.
+
+## Dependencies (high level)
+
+Key dependencies from package.json:
+- react, react-dom
+- vite
+- @reduxjs/toolkit, react-redux
+- tailwindcss, @tailwindcss/postcss
+- ag-grid-community, ag-grid-react
+- react-router-dom
+- axios
+- lucide-react
+- swiper
+- react-hot-toast
+
+Dev dependencies include Vite plugin for React, ESLint, and TypeScript type packages for React.
+
+## Contributing
+
+- Open an issue for feature requests or bug reports.
+- Create a branch per feature/fix and submit a pull request.
+- Follow existing ESLint rules; run `npm run lint` before submitting.
+
+## Deployment
+
+- The repo contains a `netlify.toml` file — it's prepared for deployment to Netlify. Adjust build settings/redirects as needed.
+- Typical build command for deployment: npm run build (output resides in `dist/` when using Vite).
+
+## Troubleshooting
+
+- If dev server fails to start, check Node.js / npm versions and ensure dependencies are installed.
+- For Tailwind issues, confirm `index.css` imports Tailwind base/components/utilities and `tailwind.config.js` content paths include your `src` files.
+
+## License
+
+No license specified in the repository. Add a LICENSE file if you want to make the project open-source with a chosen license.
+
+## Contact / Author
+
+Repository: RahulFreeCoder/cme-frontend  
+Description: CME frontend app for event management

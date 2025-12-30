@@ -4,7 +4,7 @@ import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import axiosInstance from "../../services/axiosinstance";
 import toast from "react-hot-toast";
-import { Search, CheckCircle, XCircle, RotateCcw, Wallet } from "lucide-react";
+import { Search, CheckCircle, XCircle, RotateCcw, Wallet , ChevronDown} from "lucide-react";
 
 // Core Styles
 import "ag-grid-community/styles/ag-theme-alpine.css";
@@ -14,8 +14,19 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 export default function Payments() {
   const gridRef = useRef();
   
-  // 1️⃣ RESTORED: Getting CME IDs from Redux Slice
-  const allCmeIds= useSelector((s) => s.organizer.cmeIds);
+   // 1. Redux State: Pulling full event objects to get titles
+  const allCmeIds = useSelector((s) => s.organizer.cmeIds || []);
+  const rawEventsFromRedux = useSelector((s) => s.events.events || []);
+
+  // 2. DERIVED STATE (Memoized filtering)
+  const filteredEvents = useMemo(() => {
+    // Return empty if IDs or events haven't loaded yet
+    if (!allCmeIds.length || !rawEventsFromRedux.length) return [];
+    
+    return rawEventsFromRedux.filter((event) => 
+      allCmeIds.includes(event.cmeId) || allCmeIds.includes(event.id)
+    );
+  }, [allCmeIds, rawEventsFromRedux]);
 
   const [selectedCmeId, setSelectedCmeId] = useState(null);
   const [rowData, setRowData] = useState([]);
@@ -155,29 +166,36 @@ export default function Payments() {
   ], [updatePaymentStatus]);
 
   return (
-    <div className="p-8 bg-[#f8fafc] min-h-screen">
+    <div className="p-4 md:p-10 bg-[#fcfdfe] min-h-screen">
       <div className="max-w-5xl mx-auto space-y-6">
         
-        {/* CME SELECTION CHIPS */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center">
-          <h2 className="text-xl font-black text-slate-800 mb-4 flex items-center justify-center gap-2">
-            <Wallet className="text-emerald-500" size={20} /> Select CME for Payment Verification
-          </h2>
-          <div className="flex flex-wrap justify-center gap-2">
-            {allCmeIds?.map((id) => (
-              <button
-                key={id}
-                onClick={() => { setSelectedCmeId(id); setSearchText(""); }}
-                className={`px-5 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
-                  selectedCmeId === id 
-                    ? "bg-slate-900 border-slate-900 text-white shadow-lg" 
-                    : "bg-white border-slate-100 text-slate-500 hover:border-emerald-300"
-                }`}
+                {/* 1. SELECTOR CARD */}
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
+          
+          <div className="max-w-xl mx-auto text-center">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight mb-6">Payments Management</h2>
+            
+            <div className="relative group">
+              <label className="absolute -top-2 left-4 px-2 bg-white text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] z-10">
+                Select Active Event
+              </label>
+              <select
+                value={selectedCmeId || ""}
+                onChange={(e) => { setSelectedCmeId(e.target.value); setSearchText(""); }}
+                className="w-full pl-6 pr-12 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none cursor-pointer"
               >
-                {id}
-              </button>
-            ))}
-            {(!allCmeIds || allCmeIds.length === 0) && <p className="text-slate-400 italic">No CMEs available</p>}
+                <option value="" disabled>Search by Title or ID...</option>
+                {filteredEvents?.map((ev) => (
+                  <option key={ev.cmeId} value={ev.cmeId}>
+                    [{ev.cmeId}] — {ev.title}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-5 pointer-events-none text-slate-400 group-hover:text-indigo-500 transition-colors">
+                <ChevronDown size={18} />
+              </div>
+            </div>
           </div>
         </div>
 
