@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../services/axiosinstance";
-import toast from "react-hot-toast";
-
+import notify from '../ui/notify';
 // External Components
 import ChipsSelector from "./ChipSelector";
 import TimePicker from "./TimePicker";
@@ -15,6 +14,7 @@ import {
   CreditCard, ListChecks, Mic2, Briefcase, CheckCircle2,
   Clock, Landmark, Globe, X, Award
 } from "lucide-react";
+import { suggestEndTime } from "../utils/dataFormatter";    
 
 /* ---------- Constants ---------- */
 const STEPS = [
@@ -26,6 +26,14 @@ const STEPS = [
 const SPECIALITIES = ["Cardiology", "Neurology", "Orthopedics", "Pediatrics", "General Medicine", "Radiology"];
 const CME_CATEGORIES = ["Conference", "Workshop", "Seminar", "Webinar"];
 const FEE_CATEGORIES = ["Doctor", "Student", "Early Bird", "Regular"];
+const PREDEFINED_CHIPS = [
+  "Lunch Included", 
+  "Certificate Provided", 
+  "Free Parking", 
+  "Bring ID Proof", 
+  "Wi-Fi Available", 
+  "Study Material"
+];
 
 /* ---------- UI Sub-Components ---------- */
 const CleanInput = ({ label, type = "text", value = "", onChange, disabled = false, error, textarea = false }) => (
@@ -87,11 +95,11 @@ export default function AddCme({ mode = "add", initialData = null }) {
 
   const [formData, setFormData] = useState({
     title: "", cmeId: "", description: "", speciality: [], cmeCategories: [],
-    startDate: "", endDate: "", startTime: "", endTime: "",
-    location: { address: "", city: "", state: "", country: "", zipCode: "" },
+    startDate: "", endDate: "", startTime: "09:00 AM", endTime: "06:00 PM",
+    location: { address: "", city: "Pune", state: "MH", country: "India", zipCode: "" },
     registrationFees: [], credits: 0, totalSeats: 0, isActive: true,
     schedule: [
-      { date: "", time: "", topics: "", speaker: [] 
+      { date: "", time: "", startTime:"09:00 AM", endTime:"05:00 PM", topics: "", speaker: [] 
     }
     ], 
     organizer: { organization: "", email: userEmail, phone: "", website: "", committee: "" },
@@ -104,6 +112,10 @@ export default function AddCme({ mode = "add", initialData = null }) {
   const back = () => setStep((s) => Math.max(s - 1, 0));
   const required = (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
   const pathToField = (path) => path.replace(/^\$\./, "").replace(/\[(\d+)\]/g, ".$1");
+  const validateTimes = (start, end) => {
+  if (!start || !end) return true;
+  return start < end; // In HH:mm strings, lexicographical comparison works for 24h format
+};
 
   /* ---------- Validation Logic ---------- */
   const runValidation = (stepIdx = step) => {
@@ -145,7 +157,9 @@ export default function AddCme({ mode = "add", initialData = null }) {
         if (formData.schedule.length === 0) errs.schedule = "Add at least one entry";
         formData.schedule.forEach((s, i) => {
           if (!required(s.date)) errs[`schedule.${i}.date`] = "Date required";
-          if (!required(s.time)) errs[`schedule.${i}.time`] = "Time required";
+          
+          if (!required(s.startTime)) errs[`schedule.${i}.startTime`] = "Time required";
+          if (!required(s.endTime)) errs[`schedule.${i}.endTime`] = "Time required";
           if (!required(s.topics)) errs[`schedule.${i}.topics`] = "Topic required";
           
           // Validate speakers within the schedule
@@ -192,7 +206,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
     const errMap = runValidation(step);
     if (Object.keys(errMap).length) {
       setErrors(errMap);
-      toast.error("Please fix errors before proceeding");
+      notify.error("Please fix errors before proceeding");
       return;
     }
     setErrors({});
@@ -205,7 +219,7 @@ export default function AddCme({ mode = "add", initialData = null }) {
       if (Object.keys(err).length) {
         setErrors(err);
         setStep(i);
-        toast.error("Validation failed at " + STEPS[i]);
+        notify.error("Validation failed at " + STEPS[i]);
         return;
       }
     }
@@ -213,19 +227,19 @@ export default function AddCme({ mode = "add", initialData = null }) {
       const apiMethod = mode === "edit" ? "put" : "post";
       console.log("cmeid", formData.cmeId);
       const apiUrl = mode === "edit" ? `/api/CME/admin/cme/${formData.cmeId}/update` : "/api/CME/admin/cme/add";
-      const payload = { ...formData };
+      const payload = { ...formData, name:formData.fullName };
 
       // UX/Technical Logic: Remove cmeId for 'add' mode to let backend generate it
       if (mode === "add") {
         delete payload.cmeId;
       }
 
-      await axiosInstance[apiMethod](apiUrl, payload);
-      toast.success(mode === "edit" ? "CME updated" : "CME created");
+      const response = await axiosInstance[apiMethod](apiUrl, payload);
+      notify.success(response.data.message);
       navigate("/organizer");
     } catch (err) {
       const apiData = err.response?.data;
-      toast.error(apiData?.message || "Sync failed");
+      notify.error(apiData?.message || "Sync failed");
       const formatted = {};
       Object.entries(apiData?.errors || {}).forEach(([path, msgs]) => { formatted[pathToField(path)] = msgs[0]; });
       setErrors(formatted);
@@ -404,9 +418,37 @@ export default function AddCme({ mode = "add", initialData = null }) {
                           <Trash2 size={18}/>
                         </button>
 
-                        <div className="grid grid-cols-2 gap-6 mb-6">
+                        <div className="grid grid-cols-3 gap-6 mb-6">
                           <CleanInput type="date" label="Session Date" value={s.date} onChange={(v) => { const arr = [...formData.schedule]; arr[i].date = v; update("schedule", arr); }} error={errors[`schedule.${i}.date`]} />
-                          <TimePicker label="Time Slot" value={s.time} onChange={(v) => { const arr = [...formData.schedule]; arr[i].time = v; update("schedule", arr); }} error={errors[`schedule.${i}.time`]} />
+                          <TimePicker 
+                            label="Start Time" 
+                            value={s.startTime} 
+                            onChange={(v) => { 
+                              const arr = [...formData.schedule]; 
+                              arr[i].startTime = v; 
+                              if (!arr[i].endTime) {
+                                arr[i].endTime = suggestEndTime(v);
+                              }
+                              update("schedule", arr); 
+                            }} 
+                            error={errors[`schedule.${i}.startTime`]} 
+                          />
+
+                          {/* End Time */}
+                          <TimePicker   
+                            label="End Time" 
+                            value={s.endTime} 
+                            onChange={(v) => { 
+                              if (!validateTimes(s.startTime, v)) {
+                                // Optional: Show a specific error or toast
+                                notify.error("Invalid Time", "End time must be after start time");
+                              }
+                              const arr = [...formData.schedule]; 
+                              arr[i].endTime = v; 
+                              update("schedule", arr); 
+                            }} 
+                            error={errors[`schedule.${i}.endTime`]} 
+                          />
                         </div>
                         
                         <CleanInput label="Session Topic" textarea value={s.topics} onChange={(v) => { const arr = [...formData.schedule]; arr[i].topics = v; update("schedule", arr); }} error={errors[`schedule.${i}.topics`]} />
@@ -449,20 +491,62 @@ export default function AddCme({ mode = "add", initialData = null }) {
                                   </button>
                                 </div>
 
-                                {/* Row 1: Name and Speciality */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                  <CleanInput label="Speaker Name" value={sp.name} onChange={(v) => {
-                                    const arr = [...formData.schedule];
-                                    arr[i].speaker[si].name = v;
-                                    update("schedule", arr);
-                                  }} />
-                                  <CleanInput label="Speciality" value={sp.speciality} onChange={(v) => {
-                                    const arr = [...formData.schedule];
-                                    arr[i].speaker[si].speciality = v;
-                                    update("schedule", arr);
-                                  }} />
-                                </div>
+                                {/* Row 1: Salutation, Name and Speciality using a 12-column grid for tighter spacing */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4 items-end">
+                                  
+                                  {/* Salutation Dropdown - Tighter width */}
+                                  <div className="md:col-span-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
+                                      Salutation
+                                    </label>
+                                    <select 
+                                      value={sp.salutation || "Dr."} 
+                                      onChange={(e) => {
+                                        const arr = [...formData.schedule];
+                                        const newSalutation = e.target.value;
+                                        arr[i].speaker[si].salutation = newSalutation;
+                                        // Keep the internal logic for full name
+                                        arr[i].speaker[si].name = `${newSalutation} ${sp.name || ""}`.trim();
+                                        update("schedule", arr);
+                                      }}
+                                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none"
+                                    >
+                                      <option value="Dr.">Dr.</option>
+                                      <option value="Prof.">Prof.</option>
+                                      <option value="Mr.">Mr.</option>
+                                      <option value="Ms.">Ms.</option>
+                                      <option value="Mrs.">Mrs.</option>
+                                    </select>
+                                  </div>
 
+                                  {/* Speaker Name - Takes more space */}
+                                  <div className="md:col-span-6">
+                                    <CleanInput 
+                                      label="Speaker Name" 
+                                      value={sp.name} 
+                                      onChange={(v) => {
+                                        const arr = [...formData.schedule];
+                                        arr[i].speaker[si].name = v;
+                                        const salutation = sp.salutation || "Dr.";
+                                        arr[i].speaker[si].fullName = `${salutation} ${v}`.trim();
+                                        update("schedule", arr);
+                                      }} 
+                                    />
+                                  </div>
+
+                                  {/* Speciality - Remaining space */}
+                                  <div className="md:col-span-4">
+                                    <CleanInput 
+                                      label="Speciality" 
+                                      value={sp.speciality} 
+                                      onChange={(v) => {
+                                        const arr = [...formData.schedule];
+                                        arr[i].speaker[si].speciality = v;
+                                        update("schedule", arr);
+                                      }} 
+                                    />
+                                  </div>
+                                </div>
                                 {/* Row 2: Designation */}
                                 <div className="mb-4">
                                   <CleanInput label="Designation" value={sp.designation} onChange={(v) => {
@@ -599,25 +683,75 @@ export default function AddCme({ mode = "add", initialData = null }) {
 
               {step === 7 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <SectionHeader icon={ListChecks} title="Additional Notes" desc="Misc instructions or registration details" />
-                  <CleanInput label="Information Snippets (Comma-separated)" textarea 
-                    placeholder="Lunch provided, Free parking, Carry ID card..."
-                    value={formData.additionalInformation.join(", ")}
-                    onChange={(v) => {
-                        // Split by comma, but DON'T trim the individual strings yet
-                        const tags = v.split(","); 
-                        update("additionalInformation", tags);
+                  <SectionHeader icon={ListChecks} title="Additional Notes" desc="Select common tags or add custom instructions" />
+                  
+                  {/* 1. CHIPS SELECTION */}
+                  <div className="mb-6">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">
+                      Quick Select Tags
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {PREDEFINED_CHIPS.map((chip) => {
+                        const isSelected = formData.additionalInformation.includes(chip);
+                        return (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              let updatedInfo;
+                              if (isSelected) {
+                                updatedInfo = formData.additionalInformation.filter(item => item !== chip);
+                              } else {
+                                updatedInfo = [...formData.additionalInformation, chip];
+                              }
+                              update("additionalInformation", updatedInfo);
+                            }}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all border ${
+                              isSelected 
+                                ? "bg-indigo-600 border-indigo-600 text-white shadow-md" 
+                                : "bg-white border-slate-200 text-slate-500 hover:border-indigo-400"
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. CUSTOM TEXT AREA */}
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                    <CleanInput 
+                      label="Custom Instructions (Comma-separated)" 
+                      textarea 
+                      placeholder="E.g. Wear formal attire, Submit feedback by 5pm..."
+                      // Filter out predefined chips to only show custom text in the box
+                      value={formData.additionalInformation.filter(item => !PREDEFINED_CHIPS.includes(item)).join(", ")}
+                      onChange={(v) => {
+                        const customTags = v.split(",").map(t => t.trim()).filter(t => t !== "");
+                        const currentSelectedChips = formData.additionalInformation.filter(item => PREDEFINED_CHIPS.includes(item));
+                        
+                        // Combine chips + custom tags
+                        update("additionalInformation", [...currentSelectedChips, ...customTags]);
                       }}
-                    error={errors.additionalInformation}
-                  />
-                  <div className="mt-4 flex flex-wrap gap-2">
-                     {formData.additionalInformation.map((tag, i) => tag && (
-                       <span key={i} className="px-3 py-1 bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] font-black rounded-full uppercase">{tag}</span>
-                     ))}
+                      error={errors.additionalInformation}
+                    />
+                  </div>
+
+                  {/* 3. FINAL COMBINED PREVIEW */}
+                  <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Final Combined Output</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.additionalInformation.map((tag, i) => (
+                        <span key={i} className="px-3 py-1 bg-white border border-slate-200 text-slate-600 text-[9px] font-black rounded-full uppercase shadow-sm">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
-
+              
               {step === 8 && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-10">
                   <SectionHeader icon={CheckCircle2} title="Final Validation" desc="Review all data before publishing" />

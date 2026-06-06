@@ -87,9 +87,6 @@ export default function EventDetail({ event, onBack, onRegister, isRegistered })
                     )}
                   </div>
                   <h1 className="text-4xl font-black mb-3 leading-tight">{event.title}</h1>
-                  <p className="text-slate-200 max-w-2xl font-medium leading-relaxed line-clamp-2">
-                    {event.description}
-                  </p>
                 </div>
 
                 {/* REGISTRATION CARD - Logic preserved exactly */}
@@ -167,6 +164,13 @@ export default function EventDetail({ event, onBack, onRegister, isRegistered })
           
           {/* LEFT COLUMN: PRIMARY DETAILS */}
           <div className="lg:col-span-2 space-y-8">
+            <SectionCard title="About this Event">
+              <div className="prose prose-slate max-w-none">
+                <p className="text-slate-600 text-sm leading-7 font-medium whitespace-pre-line">
+                  {event.description}
+                </p>
+              </div>
+            </SectionCard>
             <SectionCard title={T.sections.eventDetails}>
               <div className="grid md:grid-cols-2 gap-6">
                 {[

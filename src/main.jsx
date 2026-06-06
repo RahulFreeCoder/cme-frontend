@@ -5,6 +5,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { store } from "./redux/store";
 import "./index.css";
+import { registerSW } from 'virtual:pwa-register';
+
+registerSW({ immediate: true })
 
 createRoot(document.getElementById("root")).render(
 

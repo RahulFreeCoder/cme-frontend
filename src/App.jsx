@@ -17,11 +17,12 @@ import UserProfile from "./components/users/UserProfile";
 import { getUpcomingEvents, getEventStats } from "./redux/events/eventsSlice";
 import Registrations from "./components/orginizer/Registrations";
 import Payments from "./components/orginizer/Payments";
+import BottomNav from './components/BottomNav';
 
 
 export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const { token } = useSelector((state) => state.auth);
+  const { user, token } = useSelector((state) => state.auth);
   const isAuthenticated = !!token;
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -81,6 +82,7 @@ export default function App() {
           },
         }}
       />
+    {isAuthenticated && <BottomNav userRole={user?.userRole} />}
     </div>
   );
 }

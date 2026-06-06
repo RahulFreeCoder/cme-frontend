@@ -1,3 +1,4 @@
+
 /* src/index.css */
 @import "tailwindcss";
 @import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -308,4 +309,40 @@
       line-height: 1.5;
     }
   }
+}
+
+/* Prevent pull-to-refresh on certain browsers and fix body height */
+body {
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; /* Prevents text selection during rapid tapping */
+}
+
+/* Allow text selection only in inputs */
+input, textarea {
+  user-select: text;
+}
+
+/* Ensure the app takes full mobile height */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+}
+
+body {
+  padding-bottom: var(--sab); /* Respects iPhone "Home Bar" */
+}
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+body, html {
+  height: -webkit-fill-available;
+  margin: 0;
 }

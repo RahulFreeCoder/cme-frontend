@@ -34,7 +34,7 @@ export default function EventCTAButton({
   seatsLeft,
   onClick,
 }) {
-  const isDisabled = seatsLeft === 0;
+  const isDisabled = false;
   const config = CTA_CONFIG[ctaLabel] ?? CTA_CONFIG.View;
   const Icon = config.icon;
 
@@ -64,7 +64,7 @@ export default function EventCTAButton({
       title={isDisabled ? "No seats available" : ctaLabel}
     >
       <Icon className="w-4 h-4" />
-      {isDisabled ? "Full" : ctaLabel}
+      {seatsLeft === 0 ? "View" : ctaLabel}
     </button>
   );
 }

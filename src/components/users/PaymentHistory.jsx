@@ -28,7 +28,7 @@ export default function PaymentHistory({ email }) {
     if (!email) return;
     axiosInstance
       .get("/api/CMERegistration/GetCMERegistrationByUserByCME", { params: { emailId: email } })
-      .then((res) => setRowData(res.data || []));
+      .then((res) => setRowData(res.data.data|| []));
   }, [email]);
 
   const eventMap = useMemo(() => {
@@ -39,36 +39,42 @@ export default function PaymentHistory({ email }) {
   }, [events]);
 
   const enrichedRowData = useMemo(() => {
-    return rowData.flatMap((r, index) => {
-      const event = eventMap[r.cmeId] || {};
-      if (!Array.isArray(r.paymentDetails) || r.paymentDetails.length === 0) {
-        return [{
-          cmeId: r.cmeId,
-          eventTitle: event.title || "—",
-          credits: event.credits ?? "—",
-          eventDate: dateFormatter(event.startDate),
-          paymentAmount: 0,
-          paymentStatus: "NO PAYMENT",
-          transactionId: "—",
-          paymentMode: "—",
-          paymentDate: "—",
-          rowId: `${r.cmeId}-${index}-nopay`
-        }];
-      }
-      return r.paymentDetails.map((p, pIndex) => ({
+  // Use (rowData || []) to ensure it's always an array
+  return (rowData || []).flatMap((r, index) => {
+    const event = eventMap[r.cmeId] || {};
+    
+    // Safety check: ensure paymentDetails is an array before mapping
+    const payments = Array.isArray(r.paymentDetails) ? r.paymentDetails : [];
+
+    if (payments.length === 0) {
+      return [{
         cmeId: r.cmeId,
         eventTitle: event.title || "—",
         credits: event.credits ?? "—",
         eventDate: dateFormatter(event.startDate),
-        paymentAmount: p.amount ?? 0,
-        paymentStatus: p.status?.toUpperCase() ?? "—",
-        transactionId: p.transactionId ?? "—",
-        paymentMode: p.modeOfPayment ?? "—",
-        paymentDate: dateFormatter(p.date),
-        rowId: `${r.cmeId}-${index}-${pIndex}`
-      }));
-    });
-  }, [rowData, eventMap]);
+        paymentAmount: 0,
+        paymentStatus: "NO PAYMENT",
+        transactionId: "—",
+        paymentMode: "—",
+        paymentDate: "—",
+        rowId: `${r.cmeId}-${index}-nopay`
+      }];
+    }
+
+    return payments.map((p, pIndex) => ({
+      cmeId: r.cmeId,
+      eventTitle: event.title || "—",
+      credits: event.credits ?? "—",
+      eventDate: dateFormatter(event.startDate),
+      paymentAmount: p.amount ?? 0,
+      paymentStatus: p.status?.toUpperCase() ?? "—",
+      transactionId: p.transactionId ?? "—",
+      paymentMode: p.modeOfPayment ?? "—",
+      paymentDate: dateFormatter(p.date),
+      rowId: `${r.cmeId}-${index}-${pIndex}`
+    }));
+  });
+}, [rowData, eventMap]);
 
   const columnDefs = useMemo(() => [
     {

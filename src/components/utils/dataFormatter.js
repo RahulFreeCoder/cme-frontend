@@ -123,27 +123,35 @@ export const getKeySpeakerLabel = (speakers = []) => {
   return finalSpeakers.map((s) => s.name).join(", ");
 };
 
-export const getUniqueKeySpeakersFromSchedule = (schedule = []) => {
-  // Use a Map to ensure uniqueness by speaker name
-  const speakerMap = new Map();
-  console.log('schedule', schedule);
-  schedule.forEach((item) => {
-    // Check if the schedule item has a speaker array
-    if (Array.isArray(item.speaker)) {
-      item.speaker.forEach((person) => {
-        // Filter for Key Speakers with valid names
-        if (person.isKeySpeaker && person.name) {
-          if (!speakerMap.has(person.name)) {
-            speakerMap.set(person.name, person);
+export const getUniqueKeySpeakersFromSchedule = (schedule) => {
+  if (!schedule || !Array.isArray(schedule)) return [];
+
+  const uniqueSpeakersMap = new Map();
+
+  schedule.forEach((session) => {
+    // Check if the session has a speaker array
+    if (session.speaker && Array.isArray(session.speaker)) {
+      session.speaker.forEach((sp) => {
+        // We only want Key Speakers with valid names
+        if (sp?.isKeySpeaker && sp?.name) {
+          const normalizedName = sp.name.trim().toLowerCase();
+          
+          // Only add if we haven't seen this speaker name before
+          if (!uniqueSpeakersMap.has(normalizedName)) {
+            uniqueSpeakersMap.set(normalizedName, {
+              ...sp,
+              name: sp.name.trim() // Keep original casing for display
+            });
           }
         }
       });
     }
   });
-  console.log('speakers:',Array.from(speakerMap.values()))
 
-  return Array.from(speakerMap.values());
+  // Convert the Map values back into an array
+  return Array.from(uniqueSpeakersMap.values());
 };
+
 export const getDiscountedFee = ({ price = 0, discountPercent = 0 }) => {
   if (price === 0) return 0;
   return discountPercent > 0 ? Math.round(price - (price * discountPercent) / 100) : price;
@@ -159,3 +167,75 @@ export const currencyFormatter = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   minimumFractionDigits: 2,
 });
+
+export const suggestEndTime = (startTime) => {
+  if (!startTime) return "";
+
+  // Split hours and minutes
+  const [hours, minutes] = startTime.split(':').map(Number);
+  
+  // Create a date object for easy math
+  const date = new Date();
+  date.setHours(hours);
+  date.setMinutes(minutes);
+  
+  // Add 1 hour
+  date.setHours(date.getHours() + 1);
+  
+  // Format back to HH:mm (24h format for HTML5 time inputs)
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${h}:${m}`;
+};
+
+export const calculateDuration = (start, end) => {
+  if (!start || !end) return null;
+
+  // Helper to convert any time string (24h or 12h) to total minutes
+  const getMinutes = (timeStr) => {
+    // 1. Remove AM/PM and split
+    const parts = timeStr.toLowerCase().replace(/[ap]m/g, '').trim().split(':');
+    let hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+
+    // 2. Adjust for 12-hour format if PM is present
+    if (timeStr.toLowerCase().includes('pm') && hours < 12) hours += 12;
+    if (timeStr.toLowerCase().includes('am') && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+  };
+
+  const startMins = getMinutes(start);
+  const endMins = getMinutes(end);
+  
+  // If the event crosses midnight, handle the negative difference
+  let diff = endMins - startMins;
+  if (diff < 0) diff += 1440; // Adds 24 hours in minutes
+
+  if (isNaN(diff)) return null;
+  if (diff < 60) return `${diff} mins`;
+  
+  const hrs = Math.floor(diff / 60);
+  const mins = diff % 60;
+  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs} hrs`;
+};
+export const formatTo12Hr = (timeStr) => {
+  if (!timeStr) return "";
+
+  // 1. Check if "AM" or "PM" is already present (case-insensitive)
+  if (/[ap]m/i.test(timeStr)) {
+    return timeStr.toUpperCase(); // Return as is, just standardized to uppercase
+  }
+
+  // 2. Handle standard "HH:mm" strings
+  const [hours, minutes] = timeStr.split(':');
+  if (!hours || !minutes) return timeStr; // Fallback for invalid formats
+
+  const h = parseInt(hours);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const formattedH = h % 12 || 12;
+  
+  // Return formatted string with leading zero for minutes if needed
+  return `${formattedH}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};

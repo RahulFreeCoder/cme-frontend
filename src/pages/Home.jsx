@@ -113,15 +113,15 @@ export default function Home() {
       }
 
       // 4. Unique Key Speakers
-      if (event?.speakers && Array.isArray(event.speakers)) {
-        event.speakers.forEach((speaker) => {
-          if (speaker?.isKeySpeaker && speaker?.name) {
-            // Normalizing name to prevent duplicates due to spacing or case
-            uniqueSpeakers.add(speaker.name.trim().toLowerCase());
-          }
-        });
-      }
-    });
+        if (event?.speakers && Array.isArray(event.speakers)) {
+          event.speakers.forEach((speaker) => {
+            if (speaker?.isKeySpeaker && speaker?.name) {
+              // Normalizing name to prevent duplicates due to spacing or case
+              uniqueSpeakers.add(speaker.name.trim().toLowerCase());
+            }
+          });
+        }
+      });
 
     result.keySpeakersCount = uniqueSpeakers.size;
     return result;
@@ -217,7 +217,7 @@ export default function Home() {
                         - 2 columns on tablets
                         - 3 columns on desktops 
                         */
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 mb-10 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredEvents.map((event) => (
                                 <EventCard 
                                     key={event.id || event._id} 

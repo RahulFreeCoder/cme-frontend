@@ -32,7 +32,8 @@ export default function Navbar({ onLoginClick, onLogoutclick }) {
         {/* 1. Logo Section */}
         <Link to="/" className="flex items-center gap-3 group">
           <div className="transition-transform group-hover:scale-110 duration-300">
-            <CmeLogo />
+            {/* Use the SVG component here */}
+            <CmeLogo className="w-12 h-12 md:w-14 md:h-14 drop-shadow-md" />
           </div>
           <div className="hidden sm:block">
             <span className="text-sm font-black text-slate-800 uppercase tracking-tighter leading-none block">

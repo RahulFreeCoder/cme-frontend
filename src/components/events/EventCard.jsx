@@ -1,5 +1,5 @@
 import React, {useState, useMemo} from "react";
-import { Calendar, MapPin, Users, Clock, Tag } from "lucide-react";
+import { Calendar, MapPin, Users, Clock, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import ImageWithFallback from "../ImageWithFallback";
 import CmeCreditBadge from "./CmecreditBadge";
 import Meta from '../ui/Meta';
@@ -11,7 +11,9 @@ import sample from '../../assets/sample.jpg';
 
 
 function EventCard({ event, onRegister, onViewEventDetails }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const feeInfo = getFinalFeeInfo(event.registrationFees, "doctor");
+  const [showSpeakerList, setShowSpeakerList] = useState(false);
   const featuredSpeakers = useMemo(
     () => getUniqueKeySpeakersFromSchedule(event.schedule),
     [event.schedule]);
@@ -28,6 +30,10 @@ function EventCard({ event, onRegister, onViewEventDetails }) {
         isAlmostFull ? "Hurry Up" : 
         "View & Register";
 
+  const toggleExpand = (e) => {
+    e.stopPropagation(); // Prevents triggering card-level clicks if any
+    setIsExpanded(!isExpanded);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-blue-100 group-hover:scale-105 transition-transform">
@@ -85,13 +91,35 @@ function EventCard({ event, onRegister, onViewEventDetails }) {
       </div>
           {/*Event Card body */}
       <div className="p-6 h-[300  px]">
-        <div className="overflow-hidden">
-          <h2 className="text-slate-800 mb-2 text-l font-black leading-tight line-clamp-2">
+        <div className="relative overflow-hidden transition-all duration-500">
+          <h2 
+            className={`text-slate-800 mb-2 text-l font-black leading-tight cursor-pointer ${isExpanded ? "" : "line-clamp-2"}`}
+            onClick={toggleExpand}
+          >
             {event.title.toUpperCase()}
           </h2>
-          <p className="text-slate-600 mb-2  text-sm line-clamp-3 leading-relaxed h-[56px]">
-            {event.description}
-          </p>
+          <div className="relative">
+            <p className={`text-slate-600 text-sm leading-relaxed transition-all duration-500 ${isExpanded ? "mb-4" : "line-clamp-3 h-[56px]"}`}>
+              {event.description}
+            </p>
+            
+            {/* GRADIENT FADE: Only shows when collapsed to cue "more info" */}
+            {!isExpanded && (
+              <div className="absolute bottom-0 left-0 w-full h-4 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+            )}
+          </div>
+
+          {/* TOGGLE BUTTON */}
+          <button 
+            onClick={toggleExpand}
+            className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-blue-600 mb-4 hover:text-blue-800 transition-colors"
+          >
+            {isExpanded ? (
+              <>Show Less <ChevronUp size={12} /></>
+            ) : (
+              <>Read More <ChevronDown size={12} /></>
+            )}
+          </button>
         </div>
 
         {/* Event Details */}
@@ -104,16 +132,58 @@ function EventCard({ event, onRegister, onViewEventDetails }) {
               <Meta icon={MapPin} text={formatAddress(event.location)} />
           </div>
 
-          <div className="flex items-center gap-2 mt-3">
-           <Avatar
-            name={event.speaker}
+          <div className="flex items-center gap-2 mt-3 relative">
+          <Avatar
+            name={featuredSpeakers.length > 1 ? "M S" : featuredSpeakers[0]?.name}
             size="md"
           />
-            <div>
-              <p className="font-medium">{featuredSpeakers[0]?.name}</p>
-              <p className="text-xs text-gray-500">Key Speaker</p>
+          
+          <div 
+            className="flex-1 cursor-pointer" 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevents card click (navigation) from firing
+              if (featuredSpeakers.length > 1) setShowSpeakerList(!showSpeakerList);
+            }}
+          >
+            <div className="flex items-center gap-1">
+              <p className="font-medium text-slate-900">
+                {featuredSpeakers.length > 1 
+                  ? "Multiple Speakers" 
+                  : (featuredSpeakers[0]?.name || "Faculty Assigned")}
+              </p>
+              {featuredSpeakers.length > 1 && (
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showSpeakerList ? 'rotate-180' : ''}`} />
+              )}
             </div>
-        </div>
+            <p className="text-xs text-gray-500">
+              {featuredSpeakers.length > 1 ? `${featuredSpeakers.length} Experts` : "Key Speaker"}
+            </p>
+          </div>
+          {/* TOOLTIP / POPOVER */}
+            {showSpeakerList && (
+              <>
+                {/* Backdrop to close tooltip when clicking outside */}
+                <div className="fixed inset-0 z-10" onClick={() => setShowSpeakerList(false)} />
+                
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-20 p-3 animate-in fade-in zoom-in duration-200 origin-bottom-left">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Featured Faculty</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                    {featuredSpeakers.map((sp, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[8px] font-black">
+                          {sp.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-slate-800 truncate">{sp.name}</p>
+                          <p className="text-[9px] text-slate-500 truncate">{sp.speciality}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Event Registration Footer */}

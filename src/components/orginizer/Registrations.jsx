@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import axiosInstance from "../../services/axiosinstance";
-import toast from "react-hot-toast";
+import notify from '../ui/notify';
 import { Search, Users, CheckCircle2, ChevronDown, Calendar, Hash } from "lucide-react";
 
 // Core Styles
@@ -13,11 +13,19 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 
 export default function Registrations() {
   const gridRef = useRef();
+
+  const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [activeReg, setActiveReg] = useState(null); // Registration being edited
+  const [certId, setCertId] = useState("");
+  const [selectedCmeId, setSelectedCmeId] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
   
   // 1. Redux State: Pulling full event objects to get titles
   const allCmeIds = useSelector((s) => s.organizer.cmeIds || []);
   const rawEventsFromRedux = useSelector((s) => s.events.events || []);
-
+  console.log('Registrations: ', registrations);
   // 2. DERIVED STATE (Memoized filtering)
   const filteredEvents = useMemo(() => {
     // Return empty if IDs or events haven't loaded yet
@@ -28,10 +36,40 @@ export default function Registrations() {
     );
   }, [allCmeIds, rawEventsFromRedux]);
 
-  const [selectedCmeId, setSelectedCmeId] = useState(null);
-  const [registrations, setRegistrations] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchText, setSearchText] = useState("");
+
+
+  const [certForm, setCertForm] = useState({
+    certificateNumber: "",
+    certificateName: "",
+    creditPoints: 0,
+    issuedBy: "",
+    issuedDate: new Date().toISOString(),
+    validTill: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+    certificateUrl: ""
+  });
+
+  const handleSaveCertificate = async () => {
+    // Guard: Don't allow saving if not marked as present
+    if (!activeReg?.isCMEAttended) {
+      notify.error("Participant must be checked-in first");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...activeReg,
+        cmeCertificateDetails: [certForm] 
+      };
+
+      await axiosInstance.patch("/api/CMERegistration/UpdateCMERegistration", payload);
+      
+      setRegistrations(prev => prev.map(r => r.id === activeReg.id ? payload : r));
+      notify.success("Certificate issued successfully");
+      setIsCertModalOpen(false);
+    } catch (error) {
+      notify.error("Failed to update certificate");
+    }
+  };
 
   /* ------------------------------------------------------------------- */
   /* 2. Fetching Logic                                                  */
@@ -48,9 +86,18 @@ export default function Registrations() {
         const response = await axiosInstance.get("/api/CMERegistration/GetCMERegistrationByUserByCME", {
           params: { cmeId: selectedCmeId },
         });
-        setRegistrations(response.data || []);
+        setRegistrations(response.data.data || []);
       } catch (err) {
-        toast.error("Failed to load registrations");
+        setRegistrations([]);
+        const errorData = err.response?.data;
+    
+        if (err.response?.status === 404) {
+          // Instead of an error toast, we show an informative info toast
+          notify.error(errorData?.message || "No registrations found for this event");
+        } else {
+          // For actual system errors (500, network failure, etc.)
+          notify.error("Failed to connect to the server");
+        }
       } finally {
         setLoading(false);
       }
@@ -76,13 +123,41 @@ export default function Registrations() {
         transactionId : row.transactionId || "0" 
       };
 
-      await axiosInstance.patch("/api/CMERegistration/UpdateCMERegistration", payload);
-      toast.success(updatedRegistration.isCMEAttended ? "Marked Present" : "Marked Absent");
+      await axiosInstance.put("/api/CMERegistration/UpdateCMERegistration", payload);
+      notify.success(
+        updatedRegistration.isCMEAttended ? "Marked Present" : "Marked Absent",
+        `Participant: ${row.emailId}`
+      );
     } catch (error) {
       setRegistrations((prev) => prev.map((r) => (r.id === row.id ? row : r)));
-      toast.error("Sync failed.");
+      notify.error("Sync failed.");
     }
   }, []);
+
+  /*---------------------------------------------------------------------*/
+  /* save certificate */
+  /*-----------------*/
+  const saveCertificate = async () => {
+    try {
+      const payload = {
+        ...activeReg,
+        certificateId: certId,
+        issueDate: new Date().toISOString()
+      };
+      
+      // Replace with your actual endpoint
+      await axiosInstance.patch("/api/CMERegistration/UpdateCertificate", payload);
+      
+      // Update local state grid
+      setRegistrations(prev => prev.map(r => r.id === activeReg.id ? payload : r));
+      
+      notify.success("Certificate Details Saved");
+      setIsCertModalOpen(false);
+    } catch (error) {
+      notify.error("Failed to save certificate");
+    }
+  };
+
 
   /* ------------------------------------------------------------------- */
   /* 4. Column Defs                                                     */
@@ -103,13 +178,22 @@ export default function Registrations() {
       headerName: "Attendance",
       field: "isCMEAttended",
       width: 200,
-      cellRenderer: (p) => (
+     cellRenderer: (p) => (
         <div className="flex items-center h-full">
-          <span className={`px-3 py-1 rounded-full text-[0.9rem] font-black uppercase border transition-all ${
-            p.value ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-orange-600 border-slate-100"
-          }`}>
-            {p.value ? "Present" : "Pending"}
-          </span>
+          <div className={`
+            relative flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300
+            ${p.value 
+              ? "bg-emerald-50/50 text-emerald-700 border-emerald-200 shadow-[0_2px_10px_-3px_rgba(16,185,129,0.2)]" 
+              : "bg-slate-50 text-slate-500 border-slate-200 shadow-sm"
+            }
+          `}>
+            {/* Small pulsing dot indicator for 'Present' */}
+            <span className={`w-8 h-8 rounded-full ${p.value ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+            
+            <span className="text-[11px] font-black uppercase tracking-widest leading-none">
+              {p.value ? "Present" : "Pending"}
+            </span>
+          </div>
         </div>
       )
     },
@@ -128,6 +212,43 @@ export default function Registrations() {
           {p.data.isCMEAttended ? "Undo" : "Check-In"}
         </button>
       )
+    },
+    {
+      headerName: "Certificate",
+      width: 150,
+      cellRenderer: (p) => {
+        const isPresent = p.data.isCMEAttended;
+        const hasCert = p.data.cmeCertificateDetails?.length > 0;
+
+        return (
+          <button 
+            disabled={!isPresent}
+            onClick={() => {
+              setActiveReg(p.data);
+              // Load existing data if available, otherwise reset form
+              setCertForm(hasCert ? p.data.cmeCertificateDetails[0] : {
+                certificateNumber: "",
+                certificateName: "",
+                creditPoints: 0,
+                issuedBy: "",
+                issuedDate: new Date().toISOString(),
+                validTill: new Date().toISOString(),
+                certificateUrl: ""
+              });
+              setIsCertModalOpen(true);
+            }}
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${
+              !isPresent 
+                ? "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed" 
+                : hasCert 
+                  ? "bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100" 
+                  : "bg-white text-slate-900 border border-slate-200 hover:border-indigo-500 shadow-sm"
+            }`}
+          >
+            {hasCert ? "Edit Cert" : "Assign Cert"}
+          </button>
+        );
+      }
     }
   ], [toggleAttendance]);
 
@@ -186,7 +307,7 @@ export default function Registrations() {
                    <div className="flex flex-col">
                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Attendance</span>
                       <span className="text-xs font-black text-slate-900">
-                        {registrations.filter(r => r.isCMEAttended).length} / {registrations.length} Present
+                        {registrations?.filter(r => r.isCMEAttended).length} / {registrations.length} Present
                       </span>
                    </div>
                 </div>
@@ -224,6 +345,87 @@ export default function Registrations() {
           </div>
         )}
       </div>
+      {isCertModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl my-auto">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Certificate Issuance</h3>
+                <p className="text-xs text-slate-500 mt-1">Participant: {activeReg?.emailId}</p>
+              </div>
+              <div className="bg-indigo-50 px-3 py-1 rounded-full text-indigo-600 text-[10px] font-black uppercase">
+                CME Credit
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Certificate Name</label>
+                <input 
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 transition-all"
+                  value={certForm.certificateName}
+                  onChange={(e) => setCertForm({...certForm, certificateName: e.target.value})}
+                  placeholder="e.g. Advanced Cardiology Workshop"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Cert Number</label>
+                <input 
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                  value={certForm.certificateNumber}
+                  onChange={(e) => setCertForm({...certForm, certificateNumber: e.target.value})}
+                  placeholder="CME-2025-001"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Credit Points</label>
+                <input 
+                  type="number"
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                  value={certForm.creditPoints}
+                  onChange={(e) => setCertForm({...certForm, creditPoints: parseInt(e.target.value)})}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Issued By</label>
+                <input 
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                  value={certForm.issuedBy}
+                  onChange={(e) => setCertForm({...certForm, issuedBy: e.target.value})}
+                  placeholder="Hospital/Council Name"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Valid Till</label>
+                <input 
+                  type="date"
+                  className="w-full mt-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                  onChange={(e) => setCertForm({...certForm, validTill: new Date(e.target.value).toISOString()})}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setIsCertModalOpen(false)}
+                className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={handleSaveCertificate}
+                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-indigo-600 transition-all"
+              >
+                Confirm & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .custom-attendance-grid .ag-root-wrapper { border: none !important; }

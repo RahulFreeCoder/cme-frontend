@@ -45,23 +45,23 @@ export default function TimePickerDigital({ label, value, onChange }) {
 
   /* -- UI ----------------------------------------------------------- */
   return (
-    <div className="relative mb-4">
-      <label className="block text-sm font-medium mb-1">{label}</label>
+    <div className="relative mb-2">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}</label>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <input
           type="number"
-          min="1"
+          min="0"
           max="12"
           value={hour}
           onChange={(e) => {
             const v = parseInt(e.target.value, 10);
-            if (v >= 1 && v <= 12) {
+            if (v >= 0 && v <= 12) {
               setHour(v);
               emit12(v, minute, period);
             }
           }}
-          className="w-20 p-2 border rounded"
+          className="w-15 p-2 border rounded"
         />
 
         <span className="text-sm">:</span>
@@ -72,7 +72,7 @@ export default function TimePickerDigital({ label, value, onChange }) {
               setMinute(e.target.value);
               emit12(hour, e.target.value, period);
             }}
-            className="w-20 p-2 border rounded"
+            className="w-15 p-2 border rounded"
           >
           {MINUTES.map((m) => (
             <option key={m} value={m}>
@@ -87,7 +87,7 @@ export default function TimePickerDigital({ label, value, onChange }) {
               setPeriod(e.target.value);
               emit12(hour, minute, e.target.value);
             }}
-            className="w-20 p-2 border rounded"
+            className="w-18 p-2 border rounded"
           >
           {PERIODS.map((p) => (
             <option key={p} value={p}>

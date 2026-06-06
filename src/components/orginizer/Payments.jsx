@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import axiosInstance from "../../services/axiosinstance";
-import toast from "react-hot-toast";
+import notify from '../ui/notify';
 import { Search, CheckCircle, XCircle, RotateCcw, Wallet , ChevronDown} from "lucide-react";
 
 // Core Styles
@@ -50,7 +50,7 @@ export default function Payments() {
         });
 
         // Mapping your nested schema to flat grid rows
-        const flattened = (response.data || []).map(reg => ({
+        const flattened = (response.data.data || []).map(reg => ({
           ...reg,
           amount: reg.paymentDetails?.[0]?.amount || 0,
           paymentStatus: reg.paymentDetails?.[0]?.status || "Pending",
@@ -60,7 +60,22 @@ export default function Payments() {
 
         setRowData(flattened);
       } catch (err) {
-        toast.error("Failed to load records");
+        setRowData([]);
+        const errorData = err.response?.data;
+    
+        if (err.response?.status === 404) {
+          // Instead of an error toast, we show an informative info toast
+          notify.error(
+            errorData?.message || "No Payments for this event", 
+            errorData?.detail || "Verify CMEId, EmailId, and TransactionId."
+          );
+        } else {
+          // For actual system errors (500, network failure, etc.)
+           notify.error(
+            errorData?.message || "Sever Error,", 
+            errorData?.detail || "Please retry or contact system adminstrator"
+          );
+        }
       } finally {
         setLoading(false);
       }
@@ -89,18 +104,28 @@ export default function Payments() {
     const payload = {
       cmeId: row.cmeId,
       emailId: row.emailId,
-      transactionId: row.paymentDetails[0]?.transactionId, // Map from nested array
+      transactionId: (row.paymentDetails?.[0]?.transactionId) || "0", // Map from nested array
       status: newStatus // The new status being assigned
     };
 
     // 3. Send the specific payload to the backend
-    await axiosInstance.patch("/api/CMERegistration/UpdateCMERegistration", payload);
+    await axiosInstance.put("/api/CMERegistration/UpdateCMERegistration", payload);
     
-    toast.success(`Payment status: ${newStatus}`);
+    notify.success("Payment Updated", `Status: ${newStatus}`);
   } catch (error) {
     // Rollback local state on failure
     setRowData((prev) => prev.map((r) => (r.id === row.id ? row : r)));
-    toast.error("Update failed");
+
+    // 1. Extract error details from the 500 response
+    const errorData = error.response?.data;
+    const errorMessage = errorData?.message || "Update failed";
+    const errorDetail = errorData?.detail || "Please check your connection";
+
+    // 2. Show detailed Toast
+    notify.error(
+    errorData?.message || "Sync Failed", 
+    errorData?.detail || "Verify CMEId, EmailId, and TransactionId."
+  );
   }
 }, []);
 
@@ -217,7 +242,7 @@ export default function Payments() {
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Revenue (Confirmed)</p>
                   <p className="text-lg font-black text-emerald-600">
-                    ₹{rowData.filter(r => r.paymentStatus === 'Confirmed').reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
+                    ₹{rowData?.filter(r => r.paymentStatus === 'Confirmed').reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
                   </p>
                 </div>
               </div>
